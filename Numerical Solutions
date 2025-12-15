@@ -1,0 +1,143 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+def cyber_insurability(state, params):
+    """
+    state = [x, y, z]
+    x = vulnerability level
+    y = pressure of attacks
+    z = insurability / underwriter confidence
+    """
+    x, y, z = state
+    alpha, beta, gamma, delta, eps, theta, psi = params
+
+    dx = alpha*x - beta*x*y - gamma*x*z
+    dy = delta*x*y - eps*y
+    dz = theta*x*z - psi*z
+
+    return np.array([dx, dy, dz])
+
+def rk4_step(f, state, params, dt):
+    k1 = f(state, params)
+    k2 = f(state + 0.5*dt*k1, params)
+    k3 = f(state + 0.5*dt*k2, params)
+    k4 = f(state + dt*k3, params)
+
+    return state + (dt/6.0)*(k1 + 2*k2 + 2*k3 + k4)
+
+
+def simulate_system(f, initial, params, T=100, dt=0.01):
+    steps = int(T/dt)
+    traj = np.zeros((steps, len(initial)))
+    state = np.array(initial)
+
+    for i in range(steps):
+        traj[i] = state
+        state = rk4_step(f, state, params, dt)
+        state = np.maximum(state, 0)  # enforce non-negativity
+
+    return traj
+
+# Parameters:
+# α = alpha = vulnerability growth
+# β = beta = attack-vulnerability interaction
+# γ = gamma = control pressure induced by insurance
+# δ = delta = attack amplification
+# ε = epsilon = attack decay
+# θ = theta = insurer responsiveness
+# ψ = psi = information decay / uncertainty
+
+params = [
+    0.6,   # alpha
+    1.2,   # beta
+    0.8,   # gamma
+    0.9,   # delta
+    0.7,   # epsilon
+    0.6,   # theta
+    0.4    # psi
+]
+
+initial = [
+    0.4,  # vulnerabilities
+    0.3,  # attack pressure
+    0.2   # insurability
+]
+
+
+trajectory = simulate_system(
+    cyber_insurability,
+    initial,
+    params,
+    T=150,
+    dt=0.01
+)
+
+x = trajectory[:,0]
+y = trajectory[:,1]
+z = trajectory[:,2]
+t = np.linspace(0, 150, len(x))
+
+
+plt.figure(figsize=(10,6))
+plt.plot(t, x, label="Vulnerabilities x(t)")
+plt.plot(t, y, label="Attack pressure y(t)")
+plt.plot(t, z, label="Insurability z(t)")
+plt.xlabel("Time")
+plt.ylabel("State value")
+plt.title("SME Cyber Insurability Dynamics")
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+
+plt.figure(figsize=(6,6))
+plt.plot(x, z, linewidth=1)
+plt.xlabel("Vulnerability x")
+plt.ylabel("Insurability z")
+plt.title("Phase Portrait: Vulnerability vs Insurability")
+plt.tight_layout()
+plt.show()
+
+
+from mpl_toolkits.mplot3d import Axes3D
+
+fig = plt.figure(figsize=(7,6))
+ax = fig.add_subplot(111, projection='3d')
+ax.plot(x, y, z, linewidth=0.8)
+ax.set_xlabel("x (Vulnerability)")
+ax.set_ylabel("y (Attack Pressure)")
+ax.set_zlabel("z (Insurability)")
+ax.set_title("3D Phase Space Trajectory")
+plt.tight_layout()
+plt.show()
+
+
+epsilon = 1e-4
+
+traj1 = simulate_system(
+    cyber_insurability,
+    initial,
+    params,
+    T=100,
+    dt=0.01
+)
+
+traj2 = simulate_system(
+    cyber_insurability,
+    [initial[0]+epsilon, initial[1], initial[2]],
+    params,
+    T=100,
+    dt=0.01
+)
+
+dist = np.linalg.norm(traj1 - traj2, axis=1)
+t2 = np.linspace(0, 100, len(dist))
+
+plt.figure(figsize=(8,5))
+plt.plot(t2, dist)
+plt.yscale("log")
+plt.xlabel("Time")
+plt.ylabel("Distance between trajectories (log scale)")
+plt.title("Sensitivity to Initial Conditions (SME Data Sparsity)")
+plt.tight_layout()
+plt.show()
